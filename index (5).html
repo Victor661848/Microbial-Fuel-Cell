@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Microbial Fuel Cell Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f1f5f3;--panel:#fff;--ink:#14211d;--mute:#5d6f68;--line:#d5dfdb;--sludge:#5a4630;--water:#bfe3ea;--amber:#f2b705;--green:#1f7a5c;--red:#c4452d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif;padding:18px}
+h1{font-size:24px;margin:0 0 2px;letter-spacing:-.01em}
+.sub{color:var(--mute);margin:0 0 16px}
+.grid{display:grid;grid-template-columns:300px 1fr;gap:16px;max-width:1150px;margin:auto}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.panel h2{font-size:15px;margin:0 0 10px}
+.col{display:flex;flex-direction:column;gap:16px}
+.part{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.part:last-child{border:0}
+.part input{margin-top:4px;accent-color:var(--green)}
+.part b{font-weight:600;display:block}
+.part small{color:var(--mute);display:block;line-height:1.3}
+.tag{font-size:11px;padding:1px 6px;border-radius:9px;margin-left:6px;background:#e3efe9;color:var(--green);font-weight:500}
+.tag.a{background:#f6ecd0;color:#8a6500}
+.sl{margin:9px 0}
+.sl label{display:flex;justify-content:space-between;font-weight:500}
+.sl output{font-family:"IBM Plex Mono",monospace;color:var(--green)}
+input[type=range]{width:100%;accent-color:var(--green)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+button{font:inherit;font-weight:500;border:1px solid var(--ink);background:var(--ink);color:#fff;padding:7px 14px;border-radius:7px;cursor:pointer}
+button.ghost{background:#fff;color:var(--ink)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+svg{width:100%;height:auto;display:block}
+.status{margin-top:8px;padding:8px 12px;border-radius:7px;font-weight:500}
+.status.ok{background:#e3efe9;color:var(--green)}
+.status.bad{background:#f8e3de;color:var(--red)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+@media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--bg);border-radius:8px;padding:8px 10px}
+.stat span{color:var(--mute);font-size:12px;display:block}
+.stat b{font:500 18px "IBM Plex Mono",monospace}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.charts{grid-template-columns:1fr}}
+canvas{width:100%;height:190px;display:block}
+.note{color:var(--mute);font-size:13px;margin:6px 0 0}
+
+[hidden]{display:none!important}
+.tabs{display:flex;gap:6px;max-width:1150px;margin:0 auto 14px}
+.tabs button{background:#fff;color:var(--ink);border-color:var(--line)}
+.tabs button[aria-selected=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.build{max-width:1150px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:860px){.build{grid-template-columns:1fr}}
+.build .full{grid-column:1/-1}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mute);font-weight:500}
+.step{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.step:last-child{border:0}
+.step input{margin-top:5px;accent-color:var(--green)}
+.step input:checked~span{opacity:.5;text-decoration:line-through}
+.step b{display:block}
+ul.tight{margin:0;padding-left:18px}ul.tight li{margin:5px 0}
+.warn{border-left:4px solid var(--red);background:#fbeeea}
+.callout{background:#eef6f2;border-radius:8px;padding:9px 12px;margin-top:10px;font-size:14px}
+</style>
+</head>
+<body>
+<h1>Microbial Fuel Cell Simulator</h1>
+<p class="sub">Two-chamber MFC: bacteria in the sludge chamber release electrons, the cotton-rope salt bridge passes ions, and the circuit powers your meter. Tick the parts you have, then tune the build.</p>
+
+<div class="tabs" role="tablist">
+ <button id="t_sim" role="tab" aria-selected="true">Simulator</button>
+ <button id="t_build" role="tab" aria-selected="false">Build at home</button>
+</div>
+
+<div class="grid" id="tab_sim">
+ <div class="col">
+  <div class="panel">
+   <h2>Materials checklist</h2>
+   <label class="part"><input type="checkbox" data-p="cont1" checked><span><b>1 L container #1 (anode)<span class="tag">Instructable</span></b><small>Sealed from air so anaerobic bacteria thrive</small></span></label>
+   <label class="part"><input type="checkbox" data-p="cont2" checked><span><b>1 L container #2 (cathode)<span class="tag">Instructable</span></b><small>Open to air for oxygen</small></span></label>
+   <label class="part"><input type="checkbox" data-p="rope" checked><span><b>Cotton rope (salt bridge)<span class="tag">Instructable</span></b><small>Links both containers, carries ions</small></span></label>
+   <label class="part"><input type="checkbox" data-p="mesha" checked><span><b>Aluminum mesh, anode<span class="tag">Instructable</span></b><small>Bacteria pass electrons to it</small></span></label>
+   <label class="part"><input type="checkbox" data-p="meshc" checked><span><b>Aluminum mesh, cathode<span class="tag">Instructable</span></b><small>Electrons return here and meet oxygen</small></span></label>
+   <label class="part"><input type="checkbox" data-p="clips" checked><span><b>Paper clips (2)<span class="tag">Instructable</span></b><small>Clamp the leads to each mesh</small></span></label>
+   <label class="part"><input type="checkbox" data-p="sludge" checked><span><b>Sludge / still-pond water<span class="tag">Instructable</span></b><small>Source of anaerobic bacteria and food</small></span></label>
+   <label class="part"><input type="checkbox" data-p="salt" checked><span><b>Salt water<span class="tag a">Assumed</span></b><small>Soaks the rope so ions can move</small></span></label>
+   <label class="part"><input type="checkbox" data-p="meter" checked><span><b>Wires and multimeter<span class="tag a">Assumed</span></b><small>To read the voltage</small></span></label>
+  </div>
+  <div class="panel">
+   <h2>Build settings</h2>
+   <div class="sl"><label>Sludge amount <output id="o_fuel"></output></label><input type="range" id="fuel" min="0.2" max="1" step="0.05" value="0.7"></div>
+   <div class="sl"><label>Temperature <output id="o_temp"></output></label><input type="range" id="temp" min="5" max="45" step="1" value="28"></div>
+   <div class="sl"><label>Salt in rope water <output id="o_salt"></output></label><input type="range" id="salt" min="0" max="5" step="0.1" value="1.5"></div>
+   <div class="sl"><label>Rope length <output id="o_rope"></output></label><input type="range" id="ropeLen" min="3" max="30" step="1" value="10"></div>
+   <div class="sl"><label>Mesh area <output id="o_mesh"></output></label><input type="range" id="mesh" min="5" max="60" step="1" value="20"></div>
+   <div class="sl"><label>Load resistance <output id="o_load"></output></label><input type="range" id="load" min="1" max="4" step="0.05" value="3"></div>
+   <div class="sl"><label>Speed <output id="o_speed"></output></label><input type="range" id="speed" min="1" max="10" step="1" value="4"></div>
+   <div class="row"><button id="play">Pause</button><button class="ghost" id="reset">Restart</button></div>
+  </div>
+ </div>
+
+ <div class="col">
+  <div class="panel">
+   <svg viewBox="0 0 720 360" role="img" aria-label="Diagram of the two-chamber microbial fuel cell">
+    <defs><clipPath id="cA"><rect x="70" y="150" width="190" height="170" rx="10"/></clipPath><clipPath id="cC"><rect x="460" y="150" width="190" height="170" rx="10"/></clipPath></defs>
+    <text x="165" y="340" text-anchor="middle" font-size="13" fill="#5d6f68">Anode chamber (no air)</text>
+    <text x="555" y="340" text-anchor="middle" font-size="13" fill="#5d6f68">Cathode chamber (air)</text>
+    <g id="g_cont1"><g clip-path="url(#cA)"><rect x="70" y="190" width="190" height="130" fill="#bfe3ea"/><rect id="sludgeRect" x="70" y="250" width="190" height="70" fill="#5a4630"/><g id="bubbles"></g></g>
+      <rect x="70" y="150" width="190" height="170" rx="10" fill="none" stroke="#14211d" stroke-width="3"/><rect x="62" y="142" width="206" height="12" rx="4" fill="#14211d"/></g>
+    <g id="g_cont2"><g clip-path="url(#cC)"><rect x="460" y="190" width="190" height="130" fill="#bfe3ea"/><g id="o2"></g></g>
+      <rect x="460" y="150" width="190" height="170" rx="10" fill="none" stroke="#14211d" stroke-width="3"/></g>
+    <g id="g_rope"><path d="M215 150 C215 70 505 70 505 150 L505 250" fill="none" stroke="#d9c9a6" stroke-width="12" stroke-linecap="round"/><path d="M215 150 C215 70 505 70 505 150 L505 250" fill="none" stroke="#b9a57c" stroke-width="12" stroke-dasharray="3 6" stroke-linecap="round"/><path d="M215 150 L215 250" stroke="#d9c9a6" stroke-width="12" stroke-linecap="round"/><g id="ions"></g></g>
+    <g id="g_mesha"><rect x="105" y="170" width="14" height="130" fill="#c9d2d6" stroke="#6c7a80"/><path d="M105 185H119M105 200H119M105 215H119M105 230H119M105 245H119M105 260H119M105 275H119M105 290H119" stroke="#6c7a80"/></g>
+    <g id="g_meshc"><rect x="600" y="170" width="14" height="130" fill="#c9d2d6" stroke="#6c7a80"/><path d="M600 185H614M600 200H614M600 215H614M600 230H614M600 245H614M600 260H614M600 275H614M600 290H614" stroke="#6c7a80"/></g>
+    <g id="g_clips"><path d="M112 172 V110 h14 v-22 h-14" fill="none" stroke="#8d99a0" stroke-width="3" stroke-linejoin="round"/><path d="M607 172 V110 h-14 v-22 h14" fill="none" stroke="#8d99a0" stroke-width="3" stroke-linejoin="round"/></g>
+    <g id="g_wire"><path id="wire" d="M119 88 H300 V40 H330 M420 40 H420" fill="none" stroke="#b5532e" stroke-width="3"/><path id="wire2" d="M593 88 H420 V40" fill="none" stroke="#b5532e" stroke-width="3"/></g>
+    <g id="g_meter"><rect x="320" y="14" width="100" height="52" rx="8" fill="#14211d"/><rect x="328" y="21" width="84" height="26" rx="4" fill="#e8d98a"/><text id="meterTxt" x="370" y="40" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="16" fill="#14211d">0.000 V</text><circle cx="340" cy="57" r="3" fill="#f2b705"/><circle cx="400" cy="57" r="3" fill="#c4452d"/></g>
+    <g id="electrons"></g>
+    <text x="100" y="82" font-size="12" fill="#5d6f68">anode (-)</text><text x="590" y="82" font-size="12" fill="#5d6f68" text-anchor="end">cathode (+)</text>
+   </svg>
+   <div id="status" class="status ok"></div>
+   <div class="stats">
+    <div class="stat"><span>Voltage</span><b id="s_v">0</b></div>
+    <div class="stat"><span>Current</span><b id="s_i">0</b></div>
+    <div class="stat"><span>Power</span><b id="s_p">0</b></div>
+    <div class="stat"><span>Bacteria</span><b id="s_b">0</b></div>
+    <div class="stat"><span>Open-circuit</span><b id="s_o">0</b></div>
+    <div class="stat"><span>Internal R</span><b id="s_r">0</b></div>
+    <div class="stat"><span>Food left</span><b id="s_f">0</b></div>
+    <div class="stat"><span>Elapsed</span><b id="s_t">0</b></div>
+   </div>
+  </div>
+  <div class="charts">
+   <div class="panel"><h2>Voltage over time</h2><canvas id="c1"></canvas><p class="note">Slow rise as bacteria colonize the mesh, then decline as food runs out.</p></div>
+   <div class="panel"><h2>Power vs load resistance</h2><canvas id="c2"></canvas><p class="note">Peak power is at a load that matches the internal resistance. Dot marks your current load.</p></div>
+  </div>
+ </div>
+</div>
+
+<div class="build" id="tab_build" hidden>
+ <div class="panel full">
+  <h2>What you are building</h2>
+  <p style="margin:0">Two 1 L containers joined by a salt-water-soaked cotton rope. Bacteria in the sludge container give electrons to the aluminum mesh, the electrons travel through your wires and meter to the second mesh, and ions cross through the rope to balance the charge. Expect a few hundred millivolts at best (the Instructable targets 300 mV), enough to read on a multimeter but not enough to charge a phone.</p>
+  <div class="callout">The materials list comes from the Instructable. Steps, quantities and the salt recipe are a general two-chamber recipe I wrote to fit those materials, because I could not retrieve the original page's steps. If the Instructable's blueprint gives different dimensions, follow it.</div>
+ </div>
+
+ <div class="panel full">
+  <h2>Shopping list</h2>
+  <table>
+   <tr><th>Item</th><th>Amount</th><th>Tips</th></tr>
+   <tr><td>Plastic containers, about 1 L, with lids</td><td>2</td><td>Food tubs or rinsed juice bottles with the tops cut off. Lids matter for the sludge container.</td></tr>
+   <tr><td>Cotton rope</td><td>about 40 cm</td><td>Plain cotton clothesline or mop cord, 6 to 10 mm thick. Not nylon or polyester.</td></tr>
+   <tr><td>Aluminum mesh</td><td>2 pieces, about 5 × 4 cm (20 cm²)</td><td>Cut from aluminum window screen. Same size for both electrodes.</td></tr>
+   <tr><td>Paper clips</td><td>2</td><td>Clamp one onto the top edge of each mesh as a connection point.</td></tr>
+   <tr><td>Sludge or pond mud, plus some of its water</td><td>about 350 mL sludge and 350 mL water</td><td>Scoop from still, muddy water such as a pond edge or ditch. Still water is rich in oxygen-hating bacteria.</td></tr>
+   <tr><td>Table salt</td><td>about 15 g (2.5 level teaspoons) per liter of water</td><td>Plus 1 L of tap water. Make about 1.5 L in total so you can top up.</td></tr>
+   <tr><td>Wires with alligator clips</td><td>2</td><td>Or any insulated wire with bare ends.</td></tr>
+   <tr><td>Multimeter</td><td>1</td><td>Needs a DC volts setting (200 mV or 2 V range).</td></tr>
+   <tr><td>Tape or hot glue, scissors or a craft knife, marker</td><td>1 each</td><td>For sealing around the rope and cutting holes.</td></tr>
+   <tr><td>Rubber gloves</td><td>1 pair</td><td>For handling sludge.</td></tr>
+  </table>
+ </div>
+
+ <div class="panel">
+  <h2>Build steps</h2>
+  <label class="step"><input type="checkbox"><span><b>Prepare the containers</b>Wash both. Cut one hole in each lid or near the top of each container wall, just big enough for the rope to fit snugly.</span></label>
+  <label class="step"><input type="checkbox"><span><b>Mix the salt water</b>Stir 15 g of salt (about 2.5 level teaspoons) into 1 L of water until it dissolves. Soak the rope in it for 10 minutes.</span></label>
+  <label class="step"><input type="checkbox"><span><b>Fill the anode container</b>Put on gloves. Add about 350 mL of sludge, then about 350 mL of pond water. Sink one mesh into the mud so it is fully buried.</span></label>
+  <label class="step"><input type="checkbox"><span><b>Fill the cathode container</b>Pour in about 700 mL of the salt water. Hang the second mesh in it, mostly submerged with the top edge above the water.</span></label>
+  <label class="step"><input type="checkbox"><span><b>Connect the rope bridge</b>Thread the soaked rope through the holes so one end sits in the sludge and the other in the cathode water. Keep about 10 cm of rope between the containers, and seal gaps on the sludge container with tape or hot glue.</span></label>
+  <label class="step"><input type="checkbox"><span><b>Attach the leads</b>Clip a paper clip onto the top of each mesh, above the waterline. Connect a wire to each clip. Keep clips and wire ends dry.</span></label>
+  <label class="step"><input type="checkbox"><span><b>Measure</b>Set the multimeter to DC volts. Black probe to the anode wire (sludge side), red probe to the cathode wire. Swap them if you see a negative number.</span></label>
+  <label class="step"><input type="checkbox"><span><b>Wait and log</b>Keep it somewhere warm, around 25 to 35 °C. Write down the voltage at the same time each day for a week or more and compare with the simulator.</span></label>
+ </div>
+
+ <div class="col">
+  <div class="panel">
+   <h2>Troubleshooting</h2>
+   <ul class="tight">
+    <li><b>Reads zero:</b> check every clip and that the rope touches liquid at both ends.</li>
+    <li><b>Reads negative:</b> swap the probes.</li>
+    <li><b>Jumps high, then fades in hours:</b> this is probably corrosion of the aluminum, not bacteria. Real bacterial power builds slowly over days.</li>
+    <li><b>Very low voltage:</b> use a bigger mesh, a shorter rope, more salt in the rope water, or a warmer spot.</li>
+    <li><b>Readings drift when you touch things:</b> keep wires still and the clips out of the water.</li>
+   </ul>
+  </div>
+  <div class="panel warn">
+   <h2>Safety</h2>
+   <ul class="tight">
+    <li>Wear gloves with sludge and wash your hands afterward. Keep it away from kids, pets and food.</li>
+    <li>Do not seal the sludge container completely airtight. Gas can build up, so leave a small gap or loosen the lid.</li>
+    <li>Return the sludge to where you found it when you finish. Do not pour it down an indoor drain.</li>
+    <li>This is about 0.3 V. Never connect it to mains power or a wall charger.</li>
+   </ul>
+  </div>
+  <div class="panel">
+   <h2>Match the simulator to your build</h2>
+   <p class="note" style="margin-top:0">Sets the sliders to the recipe above.</p>
+   <button id="useBuild">Use this build in the simulator</button>
+  </div>
+ </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id), NS="http://www.w3.org/2000/svg";
+const parts=[...document.querySelectorAll("[data-p]")];
+const S={t:0,B:0.02,F:1,hist:[],run:true};
+const val=id=>+$(id).value;
+const fmtR=r=>r>=1000?(r/1000).toFixed(r>=10000?0:1)+" kΩ":Math.round(r)+" Ω";
+const has=k=>parts.find(p=>p.dataset.p===k).checked;
+
+function loadR(){return Math.pow(10,val("load"))}
+function labels(){
+ $("o_fuel").textContent=Math.round(val("fuel")*500)+" mL";
+ $("o_temp").textContent=val("temp")+" °C";
+ const sv=val("salt");$("o_salt").textContent=sv.toFixed(1)+"% · "+Math.round(sv*10)+" g/L · "+(sv*10/6).toFixed(1)+" tsp/L";
+ $("o_rope").textContent=val("ropeLen")+" cm";
+ $("o_mesh").textContent=val("mesh")+" cm²";
+ $("o_load").textContent=fmtR(loadR());
+ $("o_speed").textContent=val("speed")+"×";
+}
+function internalR(){
+ const salt=has("salt")?val("salt"):0;
+ const bridge=800*(val("ropeLen")/10)/(0.15+salt);
+ const elec=2500/(val("mesh")/10);
+ return bridge+elec;
+}
+function missing(){
+ const names={cont1:"anode container",cont2:"cathode container",rope:"cotton rope bridge",mesha:"anode mesh",meshc:"cathode mesh",clips:"paper clips",sludge:"sludge",meter:"wires and multimeter"};
+ return Object.keys(names).filter(k=>!has(k)).map(k=>names[k]);
+}
+function ocv(){
+ if(missing().length) return 0;
+ const tf=Math.exp(-Math.pow((val("temp")-30)/12,2));
+ return 0.30*(0.1+0.9*S.B)*Math.pow(Math.max(S.F,0),0.35)*(0.55+0.45*tf);
+}
+function step(dtH){
+ const tf=Math.exp(-Math.pow((val("temp")-30)/12,2));
+ const live=!missing().length;
+ const mu=0.35*tf*(has("sludge")?1:0);
+ const fuel=val("fuel");
+ const I=live?ocv()/(loadR()+internalR()):0;
+ const n=20,h=dtH/n;
+ for(let i=0;i<n;i++){
+  const dB=mu*S.B*(1-S.B)*Math.pow(Math.max(S.F,0),0.5)-0.03*S.B*(1-S.F);
+  S.B=Math.min(1,Math.max(0.001,S.B+dB*h));
+  S.F=Math.max(0,S.F-(0.01*S.B*(1+I*400)/fuel)*h*tf);
+ }
+ S.t+=dtH;
+}
+function sample(){
+ const v=ocv()*loadR()/(loadR()+internalR());
+ S.hist.push([S.t,v]);
+ if(S.hist.length>600)S.hist.shift();
+}
+
+function drawChart(cv,pts,xmax,ymax,xl,yl,mark,log){
+ const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;
+ cv.width=w*dpr;cv.height=h*dpr;const g=cv.getContext("2d");g.scale(dpr,dpr);
+ const L=44,R=10,T=8,B=28,pw=w-L-R,ph=h-T-B;
+ g.font="11px IBM Plex Sans,sans-serif";g.strokeStyle="#d5dfdb";g.fillStyle="#5d6f68";
+ for(let i=0;i<=4;i++){const y=T+ph*i/4;g.beginPath();g.moveTo(L,y);g.lineTo(L+pw,y);g.stroke();g.textAlign="right";g.fillText((ymax*(1-i/4)).toFixed(ymax<1?2:0),L-5,y+4)}
+ g.textAlign="center";g.fillText(xl,L+pw/2,h-4);
+ g.save();g.translate(11,T+ph/2);g.rotate(-Math.PI/2);g.fillText(yl,0,0);g.restore();
+ if(log){[1,2,3,4].forEach(e=>{const x=L+pw*(e-1)/3;g.fillText(fmtR(Math.pow(10,e)),x,h-16)})}
+ g.strokeStyle="#1f7a5c";g.lineWidth=2.5;g.beginPath();
+ pts.forEach((p,i)=>{const x=L+pw*p[0]/xmax,y=T+ph*(1-p[1]/ymax);i?g.lineTo(x,y):g.moveTo(x,y)});g.stroke();
+ if(mark){const x=L+pw*mark[0]/xmax,y=T+ph*(1-mark[1]/ymax);g.fillStyle="#f2b705";g.strokeStyle="#14211d";g.lineWidth=2;g.beginPath();g.arc(x,y,6,0,7);g.fill();g.stroke()}
+}
+function powerCurve(){
+ const o=ocv(),Ri=internalR(),pts=[];let mx=1e-9;
+ for(let e=1;e<=4.001;e+=0.05){const R=Math.pow(10,e),I=o/(R+Ri),P=I*I*R*1e6;pts.push([e-1,P]);mx=Math.max(mx,P)}
+ return {pts,mx};
+}
+
+function render(){
+ labels();
+ parts.forEach(p=>{const g=$("g_"+p.dataset.p);if(g)g.style.opacity=p.checked?1:0.12});
+ ["g_wire","g_meter"].forEach(id=>$(id).style.opacity=has("meter")?1:0.12);
+ $("g_clips").style.opacity=has("clips")?1:0.12;
+ $("g_meter").style.opacity=has("meter")?1:0.12;
+ $("sludgeRect").style.opacity=has("sludge")?1:0;
+ $("sludgeRect").setAttribute("y",String(320-70*val("fuel")*(0.4+0.6*Math.max(S.F,0.05))));
+ $("sludgeRect").setAttribute("height",String(70*val("fuel")*(0.4+0.6*Math.max(S.F,0.05))));
+ const o=ocv(),Ri=internalR(),R=loadR(),V=o*R/(R+Ri),I=o?V/R:0,P=V*I;
+ $("meterTxt").textContent=V.toFixed(3)+" V";
+ $("s_v").textContent=(V*1000).toFixed(0)+" mV";
+ $("s_i").textContent=(I*1000).toFixed(3)+" mA";
+ $("s_p").textContent=(P*1e6).toFixed(1)+" µW";
+ $("s_b").textContent=Math.round(S.B*100)+" %";
+ $("s_o").textContent=(o*1000).toFixed(0)+" mV";
+ $("s_r").textContent=fmtR(Ri);
+ $("s_f").textContent=Math.round(S.F*100)+" %";
+ $("s_t").textContent=S.t<48?S.t.toFixed(1)+" h":(S.t/24).toFixed(1)+" d";
+ const m=missing(),st=$("status");
+ if(m.length){st.className="status bad";st.textContent="Circuit incomplete. Missing: "+m.join(", ")+"."}
+ else if(S.F<0.08){st.className="status bad";st.textContent="Food is nearly gone. Voltage is collapsing; add fresh sludge (Restart)."}
+ else if(S.B<0.15){st.className="status ok";st.textContent="Bacteria are still colonizing the anode mesh. Voltage will climb."}
+ else if(!has("salt")){st.className="status ok";st.textContent="Working, but without salt water the rope bridge has high resistance."}
+ else{st.className="status ok";st.textContent="Running. Maximum possible output for this design is about 300 mV."}
+ const xmax=Math.max(24,S.t*1.05);
+ drawChart($("c1"),S.hist,xmax,0.3,"hours","volts",null,false);
+ const pc=powerCurve();
+ drawChart($("c2"),pc.pts,3,pc.mx*1.1,"load resistance","µW",[val("load")-1,P*1e6],true);
+}
+
+/* animation: electrons around the wire, ions through rope, gas bubbles */
+const path=$("wire"),path2=$("wire2");
+const el=[...Array(10)].map((_,i)=>{const c=document.createElementNS(NS,"circle");c.setAttribute("r",4);c.setAttribute("fill","#f2b705");c.setAttribute("stroke","#14211d");$("electrons").appendChild(c);return {c,u:i/10}});
+const ions=[...Array(6)].map((_,i)=>{const c=document.createElementNS(NS,"circle");c.setAttribute("r",4);c.setAttribute("fill","#1f7a5c");$("ions").appendChild(c);return {c,u:i/6}});
+const bub=[...Array(8)].map((_,i)=>{const c=document.createElementNS(NS,"circle");c.setAttribute("r",3);c.setAttribute("fill","#fff");c.setAttribute("opacity",.7);$("bubbles").appendChild(c);return {c,x:80+Math.random()*170,y:300-Math.random()*100,s:.2+Math.random()*.3}});
+function pos(p,u){const L=p.getTotalLength(),pt=p.getPointAtLength(u*L);return pt}
+let last=performance.now(),ticks=0;
+function frame(now){
+ const dt=Math.min(now-last,50);last=now;
+ if(S.run){
+  step(dt/1000*val("speed")*0.6);
+  ticks++;if(ticks%4===0)sample();
+ }
+ const o=ocv(),Ri=internalR(),I=o?o/(loadR()+Ri):0,sp=Math.min(I*40,0.012);
+ const wireLen=path.getTotalLength(),w2=path2.getTotalLength();
+ el.forEach(e=>{e.u=(e.u+sp*(S.run?1:0))%1;const total=wireLen+w2,d=e.u*total;
+  const pt=d<wireLen?path.getPointAtLength(d):path2.getPointAtLength(d-wireLen);
+  e.c.setAttribute("cx",pt.x);e.c.setAttribute("cy",pt.y);e.c.style.display=I>1e-6&&has("meter")?"":"none"});
+ ions.forEach(e=>{e.u=(e.u+sp*0.7*(S.run?1:0))%1;const ropePath=document.querySelector("#g_rope path");const pt=ropePath.getPointAtLength(e.u*ropePath.getTotalLength());
+  e.c.setAttribute("cx",pt.x);e.c.setAttribute("cy",pt.y);e.c.style.display=I>1e-6&&has("rope")?"":"none"});
+ bub.forEach(b=>{b.y-=b.s*(S.B*2+.1)*(S.run?1:0);if(b.y<195){b.y=310;b.x=80+Math.random()*170}b.c.setAttribute("cx",b.x);b.c.setAttribute("cy",b.y);b.c.style.display=has("sludge")&&S.B>.1?"":"none"});
+ render();
+ requestAnimationFrame(frame);
+}
+document.querySelectorAll("input").forEach(i=>i.addEventListener("input",labels));
+$("play").onclick=()=>{S.run=!S.run;$("play").textContent=S.run?"Pause":"Resume"};
+$("reset").onclick=()=>{S.t=0;S.B=0.02;S.F=1;S.hist=[]};
+
+function showTab(n){["sim","build"].forEach(k=>{$("tab_"+k).hidden=k!==n;$("t_"+k).setAttribute("aria-selected",k===n)})}
+$("t_sim").onclick=()=>showTab("sim");$("t_build").onclick=()=>showTab("build");
+$("useBuild").onclick=()=>{
+ const v={fuel:.7,temp:28,salt:1.5,ropeLen:10,mesh:20,load:3};
+ for(const k in v)$(k).value=v[k];
+ parts.forEach(p=>p.checked=true);
+ $("reset").click();labels();showTab("sim");
+};
+labels();requestAnimationFrame(frame);
+</script>
+</body>
+</html>
